@@ -1,4 +1,4 @@
-module github.com/merdeh/go-elastic
+module github.com/mrtdeh/go-elastic
 
 go 1.20
 
