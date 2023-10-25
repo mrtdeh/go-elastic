@@ -2,6 +2,7 @@ package elastic
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -12,18 +13,25 @@ var (
 )
 
 type StoreConfig struct {
-	Index   string
-	Default interface{}
+	Index           string
+	Default         interface{}
+	RefreshDuration time.Duration
 }
 
-type setting struct {
+type Store struct {
 	cnf  *StoreConfig
 	data map[string]interface{}
 }
 
-func NewStore(c *StoreConfig) (*setting, error) {
+func NewStore(c *StoreConfig) (*Store, error) {
+	if c.RefreshDuration.Seconds() == 0 {
+		c.RefreshDuration = time.Minute
+	}
+	if c.Default == nil {
+		return nil, fmt.Errorf("default not specified on store")
+	}
 
-	var s *setting = &setting{
+	var s *Store = &Store{
 		cnf:  c,
 		data: make(map[string]interface{}),
 	}
@@ -32,10 +40,17 @@ func NewStore(c *StoreConfig) (*setting, error) {
 		return nil, err
 	}
 
+	go func() {
+		for {
+			time.Sleep(c.RefreshDuration)
+			s.Refresh()
+		}
+	}()
+
 	return s, nil
 }
 
-func (s *setting) load() error {
+func (s *Store) load() error {
 	var res []byte
 	for {
 		var err error
@@ -65,11 +80,24 @@ func (s *setting) load() error {
 	return nil
 }
 
-func (s *setting) Read(myvar interface{}) error {
+func (s *Store) Read(myvar interface{}) error {
 	return unmarshal(s.data, myvar)
 }
 
-func (c *setting) Write(s interface{}) error {
+func (s *Store) Refresh() error {
+	res, err := Get(s.cnf.Index, profile_id)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(res, &s.data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Store) Write(s interface{}) error {
 	data, _ := json.Marshal(s)
 	err := Index(c.cnf.Index, data, profile_id)
 	if err != nil {
@@ -83,7 +111,7 @@ func (c *setting) Write(s interface{}) error {
 	return nil
 }
 
-func (s *setting) createDefault() error {
+func (s *Store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
 	err := unmarshal(s.cnf.Default, s.data)
