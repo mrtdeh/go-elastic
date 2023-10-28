@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -81,7 +82,14 @@ func (s *Store) load() error {
 }
 
 func (s *Store) Read(myvar interface{}) error {
-	return unmarshal(s.data, myvar)
+	if myvar == nil {
+		return fmt.Errorf("you specified variable is nil and is not struct!")
+	}
+	if reflect.ValueOf(myvar).Kind() != reflect.Pointer {
+		return fmt.Errorf("you must specify a pointer not variable")
+	}
+
+	return Unmarshal(s.data, myvar)
 }
 
 func (s *Store) Refresh() error {
@@ -114,7 +122,7 @@ func (c *Store) Write(s interface{}) error {
 func (s *Store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
-	err := unmarshal(s.cnf.Default, s.data)
+	err := Unmarshal(s.cnf.Default, s.data)
 	if err != nil {
 		return err
 	}
@@ -131,7 +139,7 @@ func (s *Store) createDefault() error {
 	return nil
 }
 
-func unmarshal(a, b interface{}) error {
+func Unmarshal(a, b interface{}) error {
 	data, err := json.Marshal(a)
 	if err != nil {
 		return err
