@@ -19,39 +19,43 @@ type StoreConfig struct {
 	RefreshDuration time.Duration
 }
 
-type Store struct {
+type store struct {
 	cnf  *StoreConfig
 	data map[string]interface{}
 }
 
-func NewStore(c *StoreConfig) (*Store, error) {
-	if c.RefreshDuration.Seconds() == 0 {
-		c.RefreshDuration = time.Minute
-	}
-	if c.Default == nil {
-		return nil, fmt.Errorf("default not specified on store")
-	}
+func NewStore(c *StoreConfig) func() (*store, error) {
+	return func() (*store, error) {
 
-	var s *Store = &Store{
-		cnf:  c,
-		data: make(map[string]interface{}),
-	}
-
-	if err := s.load(); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		for {
-			time.Sleep(c.RefreshDuration)
-			s.Refresh()
+		if c.RefreshDuration.Seconds() == 0 {
+			c.RefreshDuration = time.Minute
 		}
-	}()
+		if c.Default == nil {
+			return nil, fmt.Errorf("default not specified on store")
+		}
 
-	return s, nil
+		var s *store = &store{
+			cnf:  c,
+			data: make(map[string]interface{}),
+		}
+
+		if err := s.load(); err != nil {
+			return nil, err
+		}
+
+		go func() {
+			for {
+				time.Sleep(c.RefreshDuration)
+				s.Refresh()
+			}
+		}()
+
+		return s, nil
+	}
+
 }
 
-func (s *Store) load() error {
+func (s *store) load() error {
 	var res []byte
 	for {
 		var err error
@@ -81,7 +85,7 @@ func (s *Store) load() error {
 	return nil
 }
 
-func (s *Store) Read(myvar interface{}) error {
+func (s *store) Read(myvar interface{}) error {
 	if myvar == nil {
 		return fmt.Errorf("you specified variable is nil and is not struct!")
 	}
@@ -92,7 +96,7 @@ func (s *Store) Read(myvar interface{}) error {
 	return Unmarshal(s.data, myvar)
 }
 
-func (s *Store) Refresh() error {
+func (s *store) Refresh() error {
 	res, err := Get(s.cnf.Index, profile_id)
 	if err != nil {
 		return err
@@ -105,7 +109,7 @@ func (s *Store) Refresh() error {
 	return nil
 }
 
-func (c *Store) Write(s interface{}) error {
+func (c *store) Write(s interface{}) error {
 	data, _ := json.Marshal(s)
 	err := Index(c.cnf.Index, data, profile_id)
 	if err != nil {
@@ -119,7 +123,7 @@ func (c *Store) Write(s interface{}) error {
 	return nil
 }
 
-func (s *Store) createDefault() error {
+func (s *store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
 	err := Unmarshal(s.cnf.Default, s.data)

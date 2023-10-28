@@ -16,13 +16,15 @@ import (
 )
 
 var client *elasticsearch.Client
+var Store *store
 
 type Config struct {
-	Host      string
-	Port      int
-	User      string
-	Pass      string
-	TLSConfig *tls.Config
+	Host         string
+	Port         int
+	User         string
+	Pass         string
+	TLSConfig    *tls.Config
+	StoreManager func() (*store, error)
 }
 
 func Init(cnf *Config) error {
@@ -80,6 +82,14 @@ func Init(cnf *Config) error {
 	// Deserialize the response into a map.
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
 		return fmt.Errorf("Error parsing the response body: %s", err)
+	}
+
+	if cnf.StoreManager != nil {
+		var err error
+		Store, err = cnf.StoreManager()
+		if err != nil {
+			return fmt.Errorf("Error building store : %s", err.Error())
+		}
 	}
 
 	log.Println("connected to elasticserach")
