@@ -286,3 +286,52 @@ func Index(index string, data []byte, id string) error {
 
 	return nil
 }
+
+func IndexAny(index string, data any, id string) error {
+	dataByte, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	err = Index(index, dataByte, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetAll(index string) ([]map[string]interface{}, error, int) {
+	var r map[string]interface{}
+	var rows []map[string]interface{}
+
+	req := esapi.SearchRequest{
+		Index: []string{index},
+		Size:  esapi.IntPtr(10000),
+	}
+
+	res, err := req.Do(context.Background(), client)
+	if err != nil {
+		log.Fatalf("Eror in get all response: %s", err)
+		return nil, err, 1
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("[%s] Error get all document index=%s", res.Status(), index)
+		return nil, fmt.Errorf("Error get all document index=%s Status=%s", index, res.Status()), res.StatusCode
+	} else {
+		// Deserialize the response into a map.
+
+		if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+			log.Printf("Error parsing the response body: %s", err)
+			return nil, err, 2
+		}
+
+		for _, hit := range r["hits"].(map[string]interface{})["hits"].([]interface{}) {
+			row := hit.(map[string]interface{})["_source"].(map[string]interface{})
+			rows = append(rows, row)
+		}
+
+	}
+
+	return rows, nil, 0
+}
