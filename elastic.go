@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -53,13 +54,14 @@ func (c *esClient) pingHandler(dur time.Duration) {
 		func() {
 
 			res, err := c.conn.Info()
-			if res != nil {
+			if err != nil {
 				handleError(err)
 				log.Println("ping err : ", err)
 			}
 			defer res.Body.Close()
 
 			if res.IsError() {
+				err = errors.New(res.String())
 				handleError(err)
 				log.Println("ping err : ", err)
 			}
