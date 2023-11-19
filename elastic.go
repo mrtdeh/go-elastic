@@ -15,9 +15,10 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
-var client *elasticsearch.Client
+var client *esClient
 var Store *store
 
+type ErrorFn func(err error)
 type Config struct {
 	Host         string
 	Port         int
@@ -25,6 +26,47 @@ type Config struct {
 	Pass         string
 	TLSConfig    *tls.Config
 	StoreManager func() (*store, error)
+	OnError      ErrorFn
+}
+
+type esClient struct {
+	conn *elasticsearch.Client
+}
+
+var handleError ErrorFn
+var lastErr string
+
+func genHandleError(inFn ErrorFn) ErrorFn {
+	return func(err error) {
+		if inFn != nil {
+			if err.Error() != lastErr {
+				inFn(err)
+				lastErr = err.Error()
+			}
+		}
+	}
+}
+
+func (c *esClient) pingHandler(dur time.Duration) {
+
+	for {
+		func() {
+
+			res, err := c.conn.Info()
+			if res != nil {
+				handleError(err)
+				log.Println("ping err : ", err)
+			}
+			defer res.Body.Close()
+
+			if res.IsError() {
+				handleError(err)
+				log.Println("ping err : ", err)
+			}
+		}()
+
+		time.Sleep(dur)
+	}
 }
 
 func Init(cnf *Config) error {
@@ -65,13 +107,15 @@ func Init(cnf *Config) error {
 		},
 		// ...
 	}
-	client, err = elasticsearch.NewClient(cfg)
+	esc, err := elasticsearch.NewClient(cfg)
 	if err != nil {
+		handleError(err)
 		return fmt.Errorf("error in create elastic client : %s", err.Error())
 	}
 
-	res, err := client.Info()
+	res, err := esc.Info()
 	if err != nil {
+		handleError(err)
 		return fmt.Errorf("error in connecting to elasticsearch : %s", err.Error())
 	}
 	defer res.Body.Close()
@@ -92,6 +136,12 @@ func Init(cnf *Config) error {
 		}
 	}
 
+	client = &esClient{
+		conn: esc,
+	}
+
+	go client.pingHandler(time.Second * 5)
+
 	log.Println("connected to elasticserach")
 	return nil
 }
@@ -103,7 +153,7 @@ func Get(index string, id string) ([]byte, error) {
 		DocumentID: id,
 	}
 
-	res, err := req.Do(context.Background(), client)
+	res, err := req.Do(context.Background(), client.conn)
 	if err != nil {
 		log.Fatalf("Eror gettingr response: %s", err)
 		return nil, err
@@ -143,7 +193,7 @@ func QueryRaw(index []string, body string) (map[string]interface{}, error) {
 			"-hits.hits._type", "-hits.hits._score"},
 	}
 
-	res, err := req.Do(context.Background(), client)
+	res, err := req.Do(context.Background(), client.conn)
 	if err != nil {
 		log.Fatalf("Eror query response: %s", err)
 		return nil, err
@@ -175,7 +225,7 @@ func UpdateByQuery(index []string, body map[string]interface{}) (map[string]inte
 		Body:  &buf,
 	}
 
-	res, err := req.Do(context.Background(), client)
+	res, err := req.Do(context.Background(), client.conn)
 	if err != nil {
 		log.Fatalf("Eror query response: %s", err)
 		return nil, err
@@ -205,7 +255,7 @@ func BulkSerach(batchQuery string, indices []string) (BulkResponse, error) {
 		Body:  bytes.NewReader([]byte(batchQuery)),
 	}
 
-	res, err := req.Do(context.Background(), client)
+	res, err := req.Do(context.Background(), client.conn)
 	if err != nil {
 		return BulkResponse{}, err
 	}
@@ -265,7 +315,7 @@ func Index(index string, data []byte, id string) error {
 	}
 
 	// Perform the request with the client.
-	res, err := req.Do(context.Background(), client)
+	res, err := req.Do(context.Background(), client.conn)
 	if err != nil {
 		log.Printf("Error getting response: %s", err)
 		return err
@@ -308,7 +358,7 @@ func GetAll(index string) ([]map[string]interface{}, error, int) {
 		Size:  esapi.IntPtr(10000),
 	}
 
-	res, err := req.Do(context.Background(), client)
+	res, err := req.Do(context.Background(), client.conn)
 	if err != nil {
 		log.Fatalf("Eror in get all response: %s", err)
 		return nil, err, 1
