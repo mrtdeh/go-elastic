@@ -35,15 +35,17 @@ type esClient struct {
 }
 
 var handleError ErrorFn
-var lastErr string
+var lastErr error
 
 func genHandleError(inFn ErrorFn) ErrorFn {
 	return func(err error) {
 		if inFn != nil {
-			if err.Error() != lastErr {
-				inFn(err)
-				lastErr = err.Error()
+			if !errors.Is(err, lastErr) {
+				if err != nil {
+					inFn(err)
+				}
 			}
+			lastErr = err
 		}
 	}
 }
@@ -52,19 +54,12 @@ func (c *esClient) pingHandler(dur time.Duration) {
 
 	for {
 		func() {
-
 			res, err := c.conn.Info()
 			if err != nil {
-				handleError(err)
 				log.Println("ping err : ", err)
 			}
 			defer res.Body.Close()
-
-			if res.IsError() {
-				err = errors.New(res.String())
-				handleError(err)
-				log.Println("ping err : ", err)
-			}
+			handleError(err)
 		}()
 
 		time.Sleep(dur)
