@@ -20,19 +20,21 @@ var Store *store
 
 type ErrorFn func(err error)
 type Config struct {
-	Host         string
-	Port         int
-	User         string
-	Pass         string
-	TLSConfig    *tls.Config
-	StoreManager func() (*store, error)
-	OnError      ErrorFn
+	Host              string
+	Port              int
+	User              string
+	Pass              string
+	TLSConfig         *tls.Config
+	StoreManager      func() (*store, error)
+	OnConnectingError ErrorFn
+	OnConnected       func()
 }
 
 type esClient struct {
 	conn *elasticsearch.Client
 }
 
+var handleConnect func()
 var handleError ErrorFn
 var lastErr error
 
@@ -57,6 +59,7 @@ func genHandleError(inFn ErrorFn) ErrorFn {
 }
 
 func (c *esClient) pingHandler(dur time.Duration) {
+	var connected bool
 	for {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -68,6 +71,12 @@ func (c *esClient) pingHandler(dur time.Duration) {
 				return
 			}
 			defer res.Body.Close()
+
+			if handleConnect != nil && !connected {
+				handleConnect()
+				connected = true
+			}
+
 			handleError(nil)
 		}()
 
@@ -89,7 +98,8 @@ func Init(cnf *Config) error {
 		return nil
 	}
 
-	handleError = genHandleError(cnf.OnError)
+	handleError = genHandleError(cnf.OnConnectingError)
+	handleConnect = cnf.OnConnected
 
 	var err error
 	var r map[string]interface{}
