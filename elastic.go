@@ -66,6 +66,7 @@ func (c *esClient) pingHandler(dur time.Duration) {
 			defer cancel()
 			res, err := c.conn.Info(c.conn.Info.WithContext(ctx))
 			if err != nil {
+				connected = false
 				handleError(err)
 				log.Println("ping err : ", err)
 				return
