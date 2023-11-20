@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -40,7 +39,14 @@ var lastErr error
 func genHandleError(inFn ErrorFn) ErrorFn {
 	return func(err error) {
 		if inFn != nil {
-			if !errors.Is(err, lastErr) {
+			var e1, e2 string
+			if err != nil {
+				e1 = err.Error()
+			}
+			if lastErr != nil {
+				e2 = lastErr.Error()
+			}
+			if e1 != e2 {
 				if err != nil {
 					inFn(err)
 				}
@@ -51,15 +57,18 @@ func genHandleError(inFn ErrorFn) ErrorFn {
 }
 
 func (c *esClient) pingHandler(dur time.Duration) {
-
 	for {
 		func() {
-			res, err := c.conn.Info()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			res, err := c.conn.Info(c.conn.Info.WithContext(ctx))
 			if err != nil {
+				handleError(err)
 				log.Println("ping err : ", err)
+				return
 			}
 			defer res.Body.Close()
-			handleError(err)
+			handleError(nil)
 		}()
 
 		time.Sleep(dur)
@@ -79,6 +88,8 @@ func Init(cnf *Config) error {
 	if client != nil {
 		return nil
 	}
+
+	handleError = genHandleError(cnf.OnError)
 
 	var err error
 	var r map[string]interface{}
