@@ -150,16 +150,16 @@ func Init(cnf *Config) error {
 		return fmt.Errorf("Error parsing the response body: %s", err)
 	}
 
+	client = &esClient{
+		conn: esc,
+	}
+
 	if cnf.StoreManager != nil {
 		var err error
 		Store, err = cnf.StoreManager()
 		if err != nil {
 			return fmt.Errorf("Error building store : %s", err.Error())
 		}
-	}
-
-	client = &esClient{
-		conn: esc,
 	}
 
 	go client.pingHandler(time.Second * 5)
