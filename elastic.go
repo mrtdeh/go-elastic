@@ -361,8 +361,8 @@ func Index(index string, data []byte, id string) error {
 
 func DeleteIndex(index string) error {
 	req := esapi.DeleteRequest{
-		Index:   index,
-		Refresh: "true",
+		Index: index,
+		// Refresh: "true",
 	}
 
 	// Perform the request with the client.
