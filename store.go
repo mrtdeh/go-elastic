@@ -21,7 +21,7 @@ type StoreConfig struct {
 
 type store struct {
 	cnf  *StoreConfig
-	data map[string]interface{}
+	Data *map[string]interface{} `json:"data"`
 }
 
 func NewStore(c *StoreConfig) func() (*store, error) {
@@ -36,7 +36,7 @@ func NewStore(c *StoreConfig) func() (*store, error) {
 
 		var s *store = &store{
 			cnf:  c,
-			data: make(map[string]interface{}),
+			Data: &map[string]interface{}{},
 		}
 
 		if err := s.load(); err != nil {
@@ -77,7 +77,7 @@ func (s *store) load() error {
 		break
 	}
 
-	err := json.Unmarshal(res, &s.data)
+	err := json.Unmarshal(res, s.Data)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (s *store) Read(myvar interface{}) error {
 		return fmt.Errorf("you must specify a pointer not variable")
 	}
 
-	return Unmarshal(s.data, myvar)
+	return Unmarshal(s.Data, myvar)
 }
 
 func (s *store) Refresh() error {
@@ -101,7 +101,7 @@ func (s *store) Refresh() error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(res, &s.data)
+	err = json.Unmarshal(res, s.Data)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (c *store) Write(s interface{}) error {
 		return err
 	}
 
-	err = json.Unmarshal(data, &c.data)
+	err = json.Unmarshal(data, c.Data)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (s *store) Reset() error {
 func (s *store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
-	err := Unmarshal(s.cnf.Default, s.data)
+	err := Unmarshal(s.cnf.Default, s.Data)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func Unmarshal(a, b interface{}) error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(data, &b)
+	err = json.Unmarshal(data, b)
 	if err != nil {
 		return err
 	}
