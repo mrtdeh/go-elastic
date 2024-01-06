@@ -359,6 +359,35 @@ func Index(index string, data []byte, id string) error {
 	return nil
 }
 
+func DeleteIndex(index string) error {
+	req := esapi.DeleteRequest{
+		Index:   index,
+		Refresh: "true",
+	}
+
+	// Perform the request with the client.
+	res, err := req.Do(context.Background(), client.conn)
+	if err != nil {
+		log.Printf("Error deleting response: %s", err)
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("[%s] Error deleteing index index=%s", index)
+		return fmt.Errorf("Error deleteing index : %s", res.Status())
+	} else {
+		// Deserialize the response into a map.
+		var r map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+			log.Printf("Error parsing the response body: %s", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func IndexAny(index string, data any, id string) error {
 	dataByte, err := json.Marshal(data)
 	if err != nil {

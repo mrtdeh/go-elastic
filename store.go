@@ -123,6 +123,17 @@ func (c *store) Write(s interface{}) error {
 	return nil
 }
 
+func (s *store) Reset() error {
+	if err := DeleteIndex(s.cnf.Index); err != nil {
+		return err
+	}
+	err := s.createDefault()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
