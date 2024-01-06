@@ -374,7 +374,7 @@ func DeleteIndex(index string) error {
 	defer res.Body.Close()
 
 	if res.IsError() {
-		log.Printf("[%s] Error deleteing index index=%s", index)
+		log.Printf("Error deleteing index index=%s", index)
 		return fmt.Errorf("Error deleteing index : %s", res.Status())
 	} else {
 		// Deserialize the response into a map.
