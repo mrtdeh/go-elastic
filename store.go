@@ -86,6 +86,10 @@ func (s *store) load() error {
 		return err
 	}
 
+	if err := cacheToFile(res); err != nil {
+		log.Println("erorr in write to cahce : ", err.Error())
+	}
+
 	return nil
 }
 
@@ -108,6 +112,10 @@ func (s *store) Refresh() error {
 	err = json.Unmarshal(res, s.Data)
 	if err != nil {
 		return err
+	}
+
+	if err := cacheToFile(res); err != nil {
+		log.Println("erorr in write to cahce : ", err.Error())
 	}
 
 	return nil
