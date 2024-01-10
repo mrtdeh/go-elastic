@@ -1,9 +1,11 @@
 package elastic
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -11,6 +13,8 @@ import (
 
 var (
 	profile_id = "general"
+
+	cacheFilename = "/var/lib/setting-management/cache"
 )
 
 type StoreConfig struct {
@@ -120,6 +124,11 @@ func (c *store) Write(s interface{}) error {
 	if err != nil {
 		return err
 	}
+
+	if err := cacheToFile(data); err != nil {
+		log.Println("erorr in write to cahce : ", err.Error())
+	}
+
 	return nil
 }
 
@@ -137,17 +146,29 @@ func (s *store) Reset() error {
 func (s *store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
-	err := Unmarshal(s.cnf.Default, s.Data)
-	if err != nil {
-		return err
+	data, err := readCache()
+
+	if err != nil || len(data) == 0 {
+		log.Printf("erorr in read cahce %v or data is empty", err)
+		err := Unmarshal(s.cnf.Default, s.Data)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Println("load from cache...")
+		err = json.Unmarshal([]byte(data), s.Data)
+		if err != nil {
+			return err
+		}
 	}
+
 	// marshal default to byte
-	data, err := json.Marshal(s.cnf.Default)
+	jsondata, err := json.Marshal(s.Data)
 	if err != nil {
 		return err
 	}
 	// index data byte to index
-	err = Index(s.cnf.Index, data, profile_id)
+	err = Index(s.cnf.Index, jsondata, profile_id)
 	if err != nil {
 		return err
 	}
@@ -164,4 +185,31 @@ func Unmarshal(a, b interface{}) error {
 		return err
 	}
 	return nil
+}
+
+func cacheToFile(content []byte) error {
+
+	base64Data := base64.StdEncoding.EncodeToString(content)
+
+	err := os.WriteFile(cacheFilename, []byte(base64Data), 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func readCache() (string, error) {
+
+	data, err := os.ReadFile(cacheFilename)
+	if err != nil {
+		return "", err
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return "", err
+	}
+
+	return string(decoded), nil
 }
