@@ -14,7 +14,7 @@ import (
 var (
 	profile_id = "general"
 
-	cacheFilename = "/var/lib/setting-management/cache"
+	cacheFilename = "/var/lib/setting-management/cache-"
 )
 
 type StoreConfig struct {
@@ -86,7 +86,7 @@ func (s *store) load() error {
 		return err
 	}
 
-	if err := cacheToFile(res); err != nil {
+	if err := s.cacheToFile(res); err != nil {
 		log.Println("erorr in write to cahce : ", err.Error())
 	}
 
@@ -114,7 +114,7 @@ func (s *store) Refresh() error {
 		return err
 	}
 
-	if err := cacheToFile(res); err != nil {
+	if err := s.cacheToFile(res); err != nil {
 		log.Println("erorr in write to cahce : ", err.Error())
 	}
 
@@ -133,7 +133,7 @@ func (c *store) Write(s interface{}) error {
 		return err
 	}
 
-	if err := cacheToFile(data); err != nil {
+	if err := c.cacheToFile(data); err != nil {
 		log.Println("erorr in write to cahce : ", err.Error())
 	}
 
@@ -154,7 +154,7 @@ func (s *store) Reset() error {
 func (s *store) createDefault() error {
 	log.Println("creating default setting...")
 	// unmarshal default as data
-	data, err := readCache()
+	data, err := s.readCache()
 
 	if err != nil || len(data) == 0 {
 		log.Printf("erorr in read cahce %v or data is empty", err)
@@ -195,11 +195,14 @@ func Unmarshal(a, b interface{}) error {
 	return nil
 }
 
-func cacheToFile(content []byte) error {
+func (s *store) cacheToFile(content []byte) error {
+	var data []byte
+	if len(content) > 0 {
+		base64Data := base64.StdEncoding.EncodeToString(content)
+		data = []byte(base64Data)
+	}
 
-	base64Data := base64.StdEncoding.EncodeToString(content)
-
-	err := os.WriteFile(cacheFilename, []byte(base64Data), 0644)
+	err := os.WriteFile(cacheFilename+s.cnf.Index, data, 0644)
 	if err != nil {
 		return err
 	}
@@ -207,9 +210,9 @@ func cacheToFile(content []byte) error {
 	return nil
 }
 
-func readCache() (string, error) {
+func (s *store) readCache() (string, error) {
 
-	data, err := os.ReadFile(cacheFilename)
+	data, err := os.ReadFile(cacheFilename + s.cnf.Index)
 	if err != nil {
 		return "", err
 	}
