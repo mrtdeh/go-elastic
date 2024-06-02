@@ -1,7 +1,6 @@
 package elastic
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -196,11 +195,11 @@ func Unmarshal(a, b interface{}) error {
 }
 
 func (s *store) cacheToFile(content []byte) error {
-	var data []byte
-	if len(content) > 0 {
-		base64Data := base64.StdEncoding.EncodeToString(content)
-		data = []byte(base64Data)
-	}
+	var data []byte = content
+	// if len(content) > 0 {
+	// 	base64Data := base64.StdEncoding.EncodeToString(content)
+	// 	data = []byte(base64Data)
+	// }
 
 	err := os.WriteFile(cacheFilename+s.cnf.Index, data, 0644)
 	if err != nil {
@@ -217,10 +216,10 @@ func (s *store) readCache() (string, error) {
 		return "", err
 	}
 
-	decoded, err := base64.StdEncoding.DecodeString(string(data))
-	if err != nil {
-		return "", err
-	}
+	// decoded, err := base64.StdEncoding.DecodeString(string(data))
+	// if err != nil {
+	// 	return "", err
+	// }
 
-	return string(decoded), nil
+	return string(data), nil
 }
